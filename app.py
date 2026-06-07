@@ -5,22 +5,43 @@ import google.generativeai as genai
 import os
 
 # Gemini API Key
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+genai.configure(api_key="YOUR_NEW_API_KEY")
 
-# Model
+# Gemini Model
 model = genai.GenerativeModel("gemini-2.5-flash")
 
 app = FastAPI()
 
+latest_resume_text = ""
 
+
+# Home Page
 @app.get("/", response_class=HTMLResponse)
 def home():
     with open("templates/index.html", "r", encoding="utf-8") as file:
         return file.read()
 
 
+# Login Page
+@app.get("/login", response_class=HTMLResponse)
+def login_page():
+    with open("templates/login.html", "r", encoding="utf-8") as file:
+        return file.read()
+
+
+# Register Page
+@app.get("/register", response_class=HTMLResponse)
+def register_page():
+    with open("templates/register.html", "r", encoding="utf-8") as file:
+        return file.read()
+
+
+# Resume Upload + Analysis
 @app.post("/upload")
 async def upload_resume(file: UploadFile = File(...)):
+
+    global latest_resume_text
+
     try:
 
         os.makedirs("uploads", exist_ok=True)
@@ -39,6 +60,8 @@ async def upload_resume(file: UploadFile = File(...)):
 
             if text:
                 resume_text += text
+
+        latest_resume_text = resume_text
 
         prompt = f"""
         Analyze the following resume and provide:
@@ -63,29 +86,40 @@ async def upload_resume(file: UploadFile = File(...)):
         }
 
     except Exception as e:
+
         return {
             "status": "error",
             "error_message": str(e)
         }
 
 
+# Interview Questions
 @app.get("/interview")
-def start_interview():
+def generate_questions():
+
+    global latest_resume_text
 
     try:
 
-        prompt = """
-        Generate 10 interview questions for a Fresher Python Developer.
+        if not latest_resume_text:
+            return {
+                "message": "Please upload resume first"
+            }
+
+        prompt = f"""
+        Based on this resume generate 10 interview questions.
+
+        Resume:
+
+        {latest_resume_text}
 
         Cover:
         - Python
-        - OOP
+        - Java
         - SQL
-        - Flask/FastAPI
         - Projects
+        - MCA Background
         - HR Questions
-
-        Return numbered questions.
         """
 
         response = model.generate_content(prompt)
@@ -96,10 +130,8 @@ def start_interview():
         }
 
     except Exception as e:
+
         return {
             "status": "error",
             "error_message": str(e)
         }
-    
-for m in genai.list_models():
-    print(m.name, m.supported_generation_methods)
